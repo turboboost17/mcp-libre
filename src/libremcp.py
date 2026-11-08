@@ -29,10 +29,14 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
-from mcp.server.fastmcp import FastMCP, Image
+import threading
+
+from mcp.server.mcpserver import Image, MCPServer
+from mcp.types import ToolAnnotations
 from pydantic import BaseModel, Field
 
-mcp = FastMCP("LibreOffice MCP Server")
+VERSION = "2.1.0"
+mcp = MCPServer("LibreOffice MCP Server", version=VERSION)
 
 BRIDGE = Path(__file__).with_name("uno_bridge.py")
 RESULT_MARKER = "@@LIBREMCP_RESULT@@"
@@ -50,12 +54,38 @@ TIMEOUT = float(os.environ.get("LIBREMCP_TIMEOUT", "120"))
 DOC = "Open document: title, file name, full path, or index from list_open_documents. Omit for the active document."
 
 
+READ_ONLY_TOOLS = {
+    "list_open_documents", "render_page", "read_document_text",
+    "writer_get_paragraphs", "writer_find_paragraphs",
+    "calc_list_sheets", "calc_get_range", "calc_find",
+    "impress_list_slides", "impress_get_slide",
+    "math_get_formula",
+    "base_list_tables", "base_describe_table", "base_query",
+}
+# Tools that overwrite files, content, or run arbitrary code (in-document edits stay undoable).
+DESTRUCTIVE_TOOLS = {
+    "save_document", "convert_document", "run_uno",
+    "writer_replace_text", "calc_set_range", "impress_set_shape_text",
+    "impress_delete_slide", "math_set_formula",
+}
+IDEMPOTENT_TOOLS = {"writer_format_paragraphs", "calc_format_range", "calc_set_range",
+                    "math_set_formula", "impress_set_shape_text", "save_document"}
+
+
 def _tool(app: Optional[str] = None):
-    """Register a tool unless its app group is disabled via LIBREMCP_APPS."""
+    """Register a tool (with MCP behaviour annotations) unless its app group is disabled."""
     def decorator(fn):
-        if app is None or app in ENABLED_APPS:
-            return mcp.tool()(fn)
-        return fn
+        if app is not None and app not in ENABLED_APPS:
+            return fn
+        name = fn.__name__
+        read_only = name in READ_ONLY_TOOLS
+        annotations = ToolAnnotations(
+            read_only_hint=read_only,
+            destructive_hint=None if read_only else name in DESTRUCTIVE_TOOLS,
+            idempotent_hint=True if read_only else name in IDEMPOTENT_TOOLS,
+            open_world_hint=False,
+        )
+        return mcp.tool(title=name.replace("_", " ").capitalize(), annotations=annotations)(fn)
     return decorator
 
 
@@ -152,14 +182,20 @@ def _invoke_bridge(request: Dict[str, Any]) -> Dict[str, Any]:
     )
 
 
+# SDK v2 runs sync tools on worker threads; serialize so concurrent calls cannot both autostart
+# LibreOffice or interleave edits on the same document.
+_BRIDGE_LOCK = threading.Lock()
+
+
 def _bridge(op: str, **args: Any) -> Dict[str, Any]:
     request = {"op": op, "args": {k: v for k, v in args.items() if v is not None},
                "pipe": PIPE, "connect_timeout": 3}
-    response = _invoke_bridge(request)
-    if not response.get("ok") and response.get("code") == "NO_CONNECTION" and AUTOSTART:
-        _start_office()
-        request["connect_timeout"] = 60
+    with _BRIDGE_LOCK:
         response = _invoke_bridge(request)
+        if not response.get("ok") and response.get("code") == "NO_CONNECTION" and AUTOSTART:
+            _start_office()
+            request["connect_timeout"] = 60
+            response = _invoke_bridge(request)
     if not response.get("ok"):
         message = response.get("error", "Unknown error")
         if response.get("code") == "NO_CONNECTION":
@@ -719,7 +755,7 @@ def main():
             print("Usage: python src/main.py [--check | --version | --help]")
             return
         if arg == "--version":
-            print("LibreOffice MCP Server v2.0.0")
+            print(f"LibreOffice MCP Server v{VERSION}")
             return
         if arg == "--check":
             print(f"program dir : {_office_program_dir()}")

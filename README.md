@@ -8,6 +8,12 @@ It talks to LibreOffice through UNO over a **local named pipe**, so no network p
 call runs a short script (`src/uno_bridge.py`) under LibreOffice's own Python, because that is the
 interpreter that can `import uno`.
 
+Built on MCP Python SDK v2. The server speaks protocol **2026-07-28** (stateless, `server/discover`)
+and still answers clients using the older `initialize` handshake (2025-11-25), such as current VS Code.
+Every tool declares MCP annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`,
+`openWorldHint: false`) so clients can auto-approve the read-only tools and prompt only for edits.
+Tool calls are serialized, so parallel requests never interleave edits on a document.
+
 ## Requirements
 
 - **LibreOffice 7.x or newer.**

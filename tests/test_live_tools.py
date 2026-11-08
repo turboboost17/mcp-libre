@@ -14,8 +14,7 @@ import uuid
 from pathlib import Path
 
 import pytest
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
+from mcp import Client, StdioServerParameters
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
@@ -51,19 +50,17 @@ def office(tmp_path_factory):
 async def _session(env, body):
     server = StdioServerParameters(command=sys.executable, args=[str(ROOT / "src" / "main.py")], env=env)
     async with asyncio.timeout(300):
-        async with stdio_client(server) as (read_stream, write_stream):
-            async with ClientSession(read_stream, write_stream) as client:
-                await client.initialize()
+        async with Client(server) as client:
 
-                async def call(name, **args):
-                    result = await client.call_tool(name, args)
-                    assert not result.isError, (name, result.content)
-                    content = result.structuredContent
-                    if content is None:
-                        return result
-                    return content["result"] if set(content) == {"result"} else content
+            async def call(name, **args):
+                result = await client.call_tool(name, args)
+                assert not result.is_error, (name, result.content)
+                content = result.structured_content
+                if content is None:
+                    return result
+                return content["result"] if set(content) == {"result"} else content
 
-                return await body(call)
+            return await body(call)
 
 
 def _wait_for_office(env):
@@ -74,7 +71,7 @@ def _wait_for_office(env):
 
 def _image(result):
     images = [c for c in result.content if c.type == "image"]
-    assert images and images[0].mimeType == "image/png"
+    assert images and images[0].mime_type == "image/png"
     assert base64.b64decode(images[0].data).startswith(b"\x89PNG")
 
 

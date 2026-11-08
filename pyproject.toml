@@ -1,6 +1,6 @@
 [project]
 name = "mcp-libre"
-version = "2.0.0"
+version = "2.1.0"
 description = "LibreOffice MCP server - edits documents open in a running LibreOffice through a local UNO pipe"
 readme = "README.md"
 license = {text = "MIT"}
@@ -19,8 +19,7 @@ classifiers = [
 ]
 requires-python = ">=3.12"
 dependencies = [
-    "httpx>=0.28.1",
-    "mcp[cli]>=1.10.1,<2",
+    "mcp[cli]>=2.3,<3",
     "pydantic>=2.0.0",
 ]
 
@@ -32,7 +31,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["libremcp.py", "main.py"]
+packages = ["src"]
 
 [dependency-groups]
 dev = [
