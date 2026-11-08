@@ -1,118 +1,33 @@
-# 🚀 Quick Start: LibreOffice MCP + Super Assistant
+# Quick Start
 
-## Setup Commands (Run in Terminal)
+1. **Install the prerequisites:** LibreOffice and uv. See [PREREQUISITES.md](PREREQUISITES.md).
+2. **Install the server:**
 
-1. **Check if everything is ready:**
    ```bash
-   <PATH_TO>/mcp-libre/mcp-helper.sh check
+   cd mcp-libre
+   uv sync --locked
+   uv run --locked python src/main.py --check
    ```
 
-2. **Test the LibreOffice MCP server:**
-   ```bash
-   <PATH_TO>/mcp-libre/mcp-helper.sh test
-   ```
+3. **Add the server to your MCP client.**
+   - VS Code: use the snippet in the [README](../README.md#configure-your-mcp-client).
+   - Claude Desktop: run `./generate-config.sh`.
+4. **Optional: install the agent skill.** Copy
+   [skills/libreoffice-mcp/SKILL.md](../skills/libreoffice-mcp/SKILL.md) into your agent's skills
+   folder. It shows the agent how to finish common tasks in a handful of calls.
+5. **Open a document in LibreOffice** and ask the assistant, for example:
+   - "Make the bullets in the Experience section of my open document match the section above it."
+   - "In the open spreadsheet, bold the header row and format column C as currency."
+   - "Add a slide after slide 2 titled 'Results' with three bullet points."
 
-3. **Start the MCP proxy for Super Assistant:**
-   ```bash
-   <PATH_TO>/mcp-libre/mcp-helper.sh proxy
-   ```
+The first request connects to your running LibreOffice. You'll see changes appear in the window,
+and Ctrl+Z undoes a whole tool call. Nothing is saved until you, or the assistant through
+`save_document`, saves the document.
 
-## Super Assistant Extension Configuration
+## Recommended client settings
 
-- **Server URL**: `http://localhost:3006`
-- **Type**: MCP Server / Local MCP
-- **Authentication**: None (local server)
-
-## Quick Commands to Try in Super Assistant
-
-### 📝 Document Creation
-- *"Create a new Writer document with a project status report"*
-- *"Create a spreadsheet for tracking expenses"*
-
-### 📖 Reading Documents  
-- *"Read the content from my document at ~/Documents/report.odt"*
-- *"What are the statistics for the document at ~/Desktop/essay.odt?"*
-
-### 🔄 Format Conversion
-- *"Convert my ODT file to PDF format"*
-- *"Convert all Word documents in my Documents folder to LibreOffice format"*
-
-### 🔍 Document Search
-- *"Find all documents containing the word 'budget' in my Documents folder"*
-- *"Search for documents with 'meeting notes' in them"*
-
-### ✏️ Text Editing
-- *"Add a conclusion paragraph to my document"*
-- *"Insert a header at the beginning of my report"*
-
-### 📊 Spreadsheet Operations
-- *"Read the data from the first 20 rows of my spreadsheet"*
-- *"Show me the contents of Sheet1 from my expenses.ods file"*
-
-## Available Tools Summary
-
-| Tool | Description | Example Use |
-|------|-------------|-------------|
-| `create_document` | Create new documents | "Create a presentation about AI" |
-| `read_document_text` | Extract text from docs | "Read my contract.odt file" |
-| `convert_document` | Change file formats | "Convert to PDF" |
-| `insert_text_at_position` | Edit document text | "Add a summary at the end" |
-| `read_spreadsheet_data` | Get spreadsheet data | "Show me the budget data" |
-| `search_documents` | Find docs by content | "Find files about project X" |
-| `batch_convert_documents` | Convert multiple files | "Convert all docs to PDF" |
-| `merge_text_documents` | Combine documents | "Merge all reports into one" |
-| `get_document_statistics` | Analyze document | "How many words in my essay?" |
-
-## File Paths You Can Use
-
-- **Home Directory**: `~/` or `/home/username/`
-- **Documents**: `~/Documents/` or `/home/username/Documents/`
-- **Desktop**: `~/Desktop/` or `/home/username/Desktop/`
-- **Temp Files**: `/tmp/` (for testing)
-
-## Supported File Formats
-
-### Input Formats (Can Read From)
-- LibreOffice: `.odt`, `.ods`, `.odp`, `.odg`
-- Microsoft Office: `.doc`, `.docx`, `.xls`, `.xlsx`, `.ppt`, `.pptx`
-- Text: `.txt`, `.rtf`
-
-### Output Formats (Can Convert To)
-- PDF: `.pdf`
-- Microsoft Office: `.docx`, `.xlsx`, `.pptx`
-- Web: `.html`, `.htm`
-- Text: `.txt`
-- LibreOffice: `.odt`, `.ods`, `.odp`, `.odg`
-
-## Troubleshooting
-
-### If Proxy Won't Start
-```bash
-# Check if port 3000 is free
-sudo netstat -tulpn | grep :3000
-
-# Kill any process using port 3000
-sudo fuser -k 3000/tcp
-```
-
-### If LibreOffice Commands Fail
-```bash
-# Test LibreOffice directly
-libreoffice --version
-libreoffice --headless --help
-```
-
-### If Super Assistant Can't Connect
-1. Make sure proxy is running (`mcp-helper.sh proxy`)
-2. Check Chrome allows localhost connections
-3. Verify Super Assistant settings use `http://localhost:3006`
-
-## Need Help?
-
-- **Run Demo**: `<PATH_TO>/mcp-libre/mcp-helper.sh demo`
-- **View Config**: `<PATH_TO>/mcp-libre/mcp-helper.sh config`
-- **Full Documentation**: See `SUPER_ASSISTANT_SETUP.md`
-
----
-
-💡 **Pro Tip**: Start with simple commands like "Create a test document" to verify everything works, then try more complex operations!
+- Auto-approve the read-only tools: `list_open_documents`, `*_get_*`, `*_find*`, `*_list_*`,
+  `render_page` and `read_document_text`.
+- Keep approval on for `run_uno`, `save_document` and `convert_document`.
+- To give the model fewer tools, set `LIBREMCP_APPS`. For example, use `writer` if you only edit
+  text documents.

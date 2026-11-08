@@ -3,13 +3,16 @@
     "libreoffice": {
       "command": "uv",
       "args": [
-        "run", 
-        "python", 
-        "/path/to/mcp-libre/src/main.py"
+        "run",
+        "--locked",
+        "--directory",
+        "/path/to/mcp-libre",
+        "python",
+        "src/main.py"
       ],
-      "cwd": "/path/to/mcp-libre",
       "env": {
-        "PYTHONPATH": "/path/to/mcp-libre/src"
+        "LIBREMCP_APPS": "writer,calc,impress,math,base",
+        "LIBREMCP_ENABLE_RUN_UNO": "1"
       }
     }
   }

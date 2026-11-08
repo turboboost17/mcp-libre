@@ -1,123 +1,34 @@
-# LibreOffice MCP Server - Prerequisites Quick Reference
+# Prerequisites
 
-## ✅ Required Components
+## LibreOffice 7.x or newer, with its UNO Python bridge
 
-### 1. LibreOffice 24.2+
-- **Purpose**: Document processing engine
-- **Ubuntu/Debian**: `sudo apt install libreoffice`
-- **CentOS/RHEL**: `sudo yum install libreoffice` 
-- **macOS**: `brew install --cask libreoffice`
-- **Windows**: [Download from libreoffice.org](https://www.libreoffice.org/download/)
+| Platform | Install | Python that can `import uno` |
+|----------|---------|------------------------------|
+| Windows | Official installer from libreoffice.org | `C:\Program Files\LibreOffice\program\python.exe`, found automatically |
+| macOS | Official `.dmg` | `/Applications/LibreOffice.app/Contents/Resources/python`, found automatically |
+| Debian / Ubuntu | `sudo apt install libreoffice python3-uno` | the system `python3` |
+| Fedora | `sudo dnf install libreoffice libreoffice-pyuno` | the system `python3` |
 
-### 2. Python 3.12+
-- **Purpose**: Runtime environment for MCP server
-- **Ubuntu/Debian**: `sudo apt install python3.12 python3.12-venv`
-- **macOS**: `brew install python@3.12`
-- **Windows**: [Download from python.org](https://www.python.org/downloads/)
+If LibreOffice is installed somewhere unusual, set `LIBREMCP_OFFICE_PROGRAM` to its `program`
+directory. You can also set `LIBREMCP_OFFICE_PYTHON` to point at an interpreter that can
+`import uno`.
 
-### 3. UV Package Manager
-- **Purpose**: Fast Python package management
-- **All Platforms**: `curl -LsSf https://astral.sh/uv/install.sh | sh`
-- **Alternative**: `pip install uv`
+## Python 3.12+ and uv
 
-## 🔧 Optional Components
-
-### 4. Node.js 18+ & NPM
-- **Purpose**: Super Assistant Chrome extension proxy
-- **Ubuntu/Debian**: `sudo apt install nodejs npm`
-- **macOS**: `brew install node`
-- **Windows**: [Download from nodejs.org](https://nodejs.org/)
-
-### 5. Java Runtime Environment (JRE 11+)
-- **Purpose**: Advanced LibreOffice features (PDF generation)
-- **Ubuntu/Debian**: `sudo apt install default-jre`
-- **macOS**: `brew install openjdk`
-- **Windows**: [Download from adoptium.net](https://adoptium.net/)
-
-## 🚀 Quick Setup Commands
-
-### Ubuntu/Debian
-```bash
-# Required components
-sudo apt update
-sudo apt install libreoffice python3.12 python3.12-venv curl
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Optional components
-sudo apt install nodejs npm default-jre
-```
-
-### macOS (with Homebrew)
-```bash
-# Required components
-brew install --cask libreoffice
-brew install python@3.12
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Optional components
-brew install node openjdk
-```
-
-### Windows (with Chocolatey)
-```bash
-# Required components
-choco install libreoffice python312
-# Then install UV manually from the website
-
-# Optional components
-choco install nodejs openjdk
-```
-
-## 🔍 Verification Commands
+The server itself runs in a uv-managed virtual environment:
 
 ```bash
-# Check LibreOffice
-libreoffice --version
-libreoffice --headless --help
-
-# Check Python
-python3 --version
-python3 -c "import sys; print('✓ Python 3.12+' if sys.version_info >= (3, 12) else '✗ Need Python 3.12+')"
-
-# Check UV
-uv --version
-
-# Check Node.js (optional)
-node --version
-npm --version
-
-# Check Java (optional)
-java -version
+# https://docs.astral.sh/uv/getting-started/installation/
+uv sync --locked
 ```
 
-## 🛠 Helper Script
+Java is not required. Node.js is not required.
 
-Use the included helper script for automated checking:
+## Verify
 
 ```bash
-# Show detailed requirements
-./mcp-helper.sh requirements
-
-# Check your system
-./mcp-helper.sh check
-
-# Test functionality
-./mcp-helper.sh test
+uv run --locked python src/main.py --check
 ```
 
-## 💾 System Requirements
-
-- **OS**: Linux, macOS, Windows
-- **RAM**: 2GB minimum (4GB recommended)
-- **Storage**: 2GB free space
-- **Network**: Internet access for initial setup only
-
-## 🔗 Integration Support
-
-- **Claude Desktop**: Direct MCP protocol
-- **Super Assistant**: Chrome extension via proxy
-- **Custom Clients**: Python FastMCP framework
-
----
-
-For the most up-to-date installation instructions, run `./mcp-helper.sh requirements`
+This prints the LibreOffice program directory, the UNO Python, the pipe name, and the enabled tool
+groups. It then tries to connect. It never starts LibreOffice.

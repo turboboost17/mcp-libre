@@ -1,270 +1,84 @@
-# LibreOffice MCP Server - Usage Examples
+# Examples
 
-This document provides practical examples of how to use the LibreOffice MCP Server.
+The examples show tool calls as `tool(arguments)` and assume the document is already open in
+LibreOffice. When `doc` is left out, the tool works on the active document.
 
-## Basic Document Operations
+## Writer: make a section match the rest of the document
 
-### Creating Documents
+```text
+writer_find_paragraphs(pattern="Experience")
+  -> {"matches": [{"index": 40, "text": "Experience"}]}
+writer_get_paragraphs(start=40, count=25)
+  -> paragraph 31 is a well-formatted bullet; paragraphs 44-52 have
+     "direct_indent": ["ParaLeftMargin", "ParaFirstLineIndent"]
+writer_format_paragraphs(indices=["44-52"], copy_from=31, reset_indents=True)
+writer_format_paragraphs(indices=[43], copy_from=30)          # the role/date line
+render_page(page=2)
+save_document()
+```
+
+Other Writer operations:
+
+```text
+writer_format_paragraphs(indices=[0], font_size=18, bold=True, align="center", space_after_mm=4)
+writer_format_paragraphs(indices=["5-9"], list_style="List 1", list_level=0)
+writer_insert_paragraphs(after_index=52, texts=["New bullet one", "New bullet two"])
+writer_replace_text(search="(\\d{4})-(\\d{4})", replace="$1–$2", regex=True)
+```
+
+## Calc
+
+```text
+calc_set_range(start="A1", values=[["Item","Qty","Price","Total"],
+                                   ["Widget",3,2.5,"=B2*C2"],
+                                   ["Gadget",2,4,"=B3*C3"]])
+calc_format_range(range="A1:D1", bold=True, background="DDDDDD", autofit_columns=True)
+calc_format_range(range="C2:D3", number_format="#,##0.00")
+calc_get_range(range="A1:D3")
+calc_find(text="gadget")
+```
+
+## Impress / Draw
+
+```text
+impress_list_slides()
+impress_add_slide(after=2, title="Results", body=["Faster", "Smaller", "Cheaper"])
+impress_get_slide(slide=3)                       -> shapes with index, type, text
+impress_set_shape_text(slide=3, shape_index=1, text=["Faster builds", "Smaller images"])
+render_page(page=3)
+```
+
+## Math
+
+```text
+math_set_formula(formula="x = {-b +- sqrt{b^2 - 4ac}} over {2a}")
+render_page()
+```
+
+## Base (read-only)
+
+```text
+base_list_tables(doc="inventory.odb")
+base_describe_table(doc="inventory.odb", table="parts")
+base_query(doc="inventory.odb", sql='SELECT "name", "qty" FROM "parts" WHERE "qty" < 5')
+```
+
+## Anything else: `run_uno`
+
+`run_uno` can do anything the other tools can't. Batch the whole change into one script, and
+assign a value to `result` to return data.
 
 ```python
-# Create a Writer document with content
-result = create_document(
-    path="/path/to/my_document.odt",
-    doc_type="writer", 
-    content="Hello, World!\n\nThis is my first LibreOffice document created via MCP."
-)
-
-# Create a Calc spreadsheet
-result = create_document(
-    path="/path/to/spreadsheet.ods",
-    doc_type="calc"
-)
-
-# Create a Presentation 
-result = create_document(
-    path="/path/to/presentation.odp",
-    doc_type="impress"
-)
+# Set page margins to 20 mm on the default page style
+style = doc.StyleFamilies.getByName("PageStyles").getByName("Default Page Style")
+for side in ("LeftMargin", "RightMargin", "TopMargin", "BottomMargin"):
+    setattr(style, side, 2000)          # 1/100 mm
+result = {"margins_mm": 20}
 ```
 
-### Reading Documents
+## Closed files
 
-```python
-# Read text content from any LibreOffice document
-content = read_document_text("/path/to/document.odt")
-print(f"Document has {content.word_count} words and {content.char_count} characters")
-print(f"Content: {content.content}")
-
-# Get document metadata
-info = get_document_info("/path/to/document.odt")
-print(f"File: {info.filename}, Size: {info.size_bytes} bytes")
-print(f"Format: {info.format}, Modified: {info.modified_time}")
+```text
+read_document_text(path="C:\\docs\\report.docx")
+convert_document(source_path="C:\\docs\\report.odt", target_path="C:\\docs\\report.pdf", target_format="pdf")
 ```
-
-### Document Conversion
-
-```python
-# Convert ODT to PDF
-result = convert_document(
-    source_path="/path/to/document.odt",
-    target_path="/path/to/document.pdf", 
-    target_format="pdf"
-)
-
-if result.success:
-    print("Conversion successful!")
-else:
-    print(f"Conversion failed: {result.error_message}")
-
-# Convert to Microsoft Word format
-result = convert_document(
-    source_path="/path/to/document.odt",
-    target_path="/path/to/document.docx",
-    target_format="docx"
-)
-
-# Convert to HTML
-result = convert_document(
-    source_path="/path/to/document.odt", 
-    target_path="/path/to/document.html",
-    target_format="html"
-)
-```
-
-## Advanced Operations
-
-### Text Manipulation
-
-```python
-# Add text to the end of a document
-result = insert_text_at_position(
-    path="/path/to/document.odt",
-    text="\n\nThis text was added to the end of the document.",
-    position="end"
-)
-
-# Insert text at the beginning
-result = insert_text_at_position(
-    path="/path/to/document.odt", 
-    text="This is a new introduction.\n\n",
-    position="start"
-)
-
-# Replace entire document content
-result = insert_text_at_position(
-    path="/path/to/document.odt",
-    text="This completely replaces the document content.",
-    position="replace"
-)
-```
-
-### Working with Spreadsheets
-
-```python
-# Read data from a spreadsheet
-data = read_spreadsheet_data(
-    path="/path/to/spreadsheet.ods",
-    sheet_name="Sheet1",  # Optional
-    max_rows=50          # Optional, default 100
-)
-
-print(f"Sheet: {data.sheet_name}")
-print(f"Dimensions: {data.row_count} rows × {data.col_count} columns")
-
-# Access cell data
-for row_idx, row in enumerate(data.data):
-    for col_idx, cell in enumerate(row):
-        print(f"Cell [{row_idx}][{col_idx}]: {cell}")
-```
-
-### Document Search
-
-```python
-# Search for documents containing specific text
-results = search_documents(
-    query="important project",
-    search_path="/home/user/Documents"  # Optional
-)
-
-for doc in results:
-    print(f"Found in: {doc['filename']}")
-    print(f"Path: {doc['path']}")
-    print(f"Context: {doc['match_context']}")
-```
-
-### Batch Operations
-
-```python
-# Convert all documents in a directory
-results = batch_convert_documents(
-    source_dir="/path/to/source_documents",
-    target_dir="/path/to/converted_documents", 
-    target_format="pdf",
-    source_extensions=[".odt", ".doc", ".docx"]  # Optional
-)
-
-for result in results:
-    if result.success:
-        print(f"✓ Converted {result.source_path}")
-    else:
-        print(f"✗ Failed to convert {result.source_path}: {result.error_message}")
-
-# Merge multiple documents
-merged_doc = merge_text_documents(
-    document_paths=[
-        "/path/to/doc1.odt",
-        "/path/to/doc2.odt", 
-        "/path/to/doc3.odt"
-    ],
-    output_path="/path/to/merged_document.odt",
-    separator="\n\n=== DOCUMENT BREAK ===\n\n"
-)
-```
-
-### Document Analysis
-
-```python
-# Get detailed statistics about a document
-stats = get_document_statistics("/path/to/document.odt")
-
-file_info = stats['file_info']
-content_stats = stats['content_stats']
-
-print(f"File: {file_info['filename']}")
-print(f"Size: {file_info['size_bytes']} bytes")
-print(f"Words: {content_stats['word_count']}")
-print(f"Characters: {content_stats['character_count']}")
-print(f"Sentences: {content_stats['sentence_count']}")
-print(f"Paragraphs: {content_stats['paragraph_count']}")
-print(f"Average words per sentence: {content_stats['average_words_per_sentence']:.1f}")
-```
-
-## Using Resources
-
-The MCP server also provides resources for document discovery:
-
-### List All Documents
-
-```python
-# Access via resource URI: documents://
-# This will list all LibreOffice documents in common locations:
-# - ~/Documents
-# - ~/Desktop  
-# - Current working directory
-```
-
-### Access Document Content
-
-```python
-# Access specific document content via resource URI: document://{path}
-# Example: document://tmp/my_document.odt
-# Returns formatted text content with metadata
-```
-
-## Integration Examples
-
-### Claude Desktop Configuration
-
-Add this to your Claude Desktop configuration file:
-
-```json
-{
-  "mcpServers": {
-    "libreoffice": {
-      "command": "uv",
-      "args": ["run", "python", "/path/to/mcp-libre/main.py"],
-      "cwd": "/path/to/mcp-libre",
-      "env": {
-        "PYTHONPATH": "/path/to/mcp-libre"
-      }
-    }
-  }
-}
-```
-
-### Common Use Cases
-
-1. **Document Processing Pipeline**
-   - Create documents from templates
-   - Insert generated content
-   - Convert to multiple formats for distribution
-
-2. **Content Analysis**
-   - Extract text from various document formats
-   - Analyze document statistics
-   - Search across document collections
-
-3. **Batch Document Management**
-   - Convert legacy documents to modern formats
-   - Merge related documents
-   - Generate reports from multiple sources
-
-4. **Integration with AI Workflows**
-   - Process documents for AI analysis
-   - Generate summaries and insights
-   - Create formatted reports from AI-generated content
-
-## Error Handling
-
-The server provides detailed error messages for common issues:
-
-- **File not found**: Clear error message with file path
-- **Conversion failures**: LibreOffice error output included
-- **Permission issues**: System-level error details
-- **Format not supported**: List of supported formats
-
-Always check the `success` field in conversion results and handle errors appropriately in your applications.
-
-## Performance Considerations
-
-- **Large documents**: Text extraction may take time for very large files
-- **Batch operations**: Process documents in smaller batches for better performance
-- **Spreadsheet data**: Use `max_rows` parameter to limit data size
-- **Concurrent operations**: The server handles one operation at a time
-
-## Troubleshooting
-
-1. **LibreOffice not found**: Ensure LibreOffice is installed and in your PATH
-2. **Java warnings**: These are usually non-fatal; core functionality will still work
-3. **Permission errors**: Check file and directory permissions
-4. **Conversion failures**: Verify target format is supported by LibreOffice

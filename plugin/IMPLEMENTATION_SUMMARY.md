@@ -1,3 +1,11 @@
+> [!WARNING]
+> **Superseded, do not install.** This document describes the legacy LibreOffice extension in
+> `plugin/`. That extension runs an unauthenticated HTTP server on port 8765, bound to all network
+> interfaces, so anyone who can reach the port can drive LibreOffice. It also exposes the same
+> capabilities to browser-based chat bridges, which opens a path for prompt injection and data
+> exfiltration. Use the MCP server in `src/` instead. It connects through a local UNO pipe and
+> edits open documents live; see the [README](../README.md). This text is kept for reference only.
+
 # 🎉 LibreOffice Plugin Implementation Summary
 
 ## ✅ What We've Built
