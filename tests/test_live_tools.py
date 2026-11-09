@@ -47,13 +47,16 @@ def office(tmp_path_factory):
         proc.kill()
 
 
-async def _session(env, body):
+async def _session(env, body, mode="auto"):
     server = StdioServerParameters(command=sys.executable, args=[str(ROOT / "src" / "main.py")], env=env)
     async with asyncio.timeout(300):
-        async with Client(server) as client:
+        async with Client(server, mode=mode) as client:
 
-            async def call(name, **args):
+            async def call(name, *, expect_error=False, **args):
                 result = await client.call_tool(name, args)
+                if expect_error:
+                    assert result.is_error, (name, result.content)
+                    return "\n".join(part.text for part in result.content if part.type == "text")
                 assert not result.is_error, (name, result.content)
                 content = result.structured_content
                 if content is None:
@@ -73,6 +76,79 @@ def _image(result):
     images = [c for c in result.content if c.type == "image"]
     assert images and images[0].mime_type == "image/png"
     assert base64.b64decode(images[0].data).startswith(b"\x89PNG")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("mode", ["legacy", "auto"])
+async def test_parallel_files_preserve_content_and_formatting(office, tmp_path, mode):
+    _wait_for_office(office)
+    paths = [tmp_path / "alpha.odt", tmp_path / "beta.docx", tmp_path / "gamma.ods"]
+    texts = [["Alpha document", "Alpha detail"], ["Beta document", "Beta detail"]]
+
+    async def body(call):
+        baseline = (await call("list_open_documents"))["documents"]
+        opened = await asyncio.gather(*(
+            call("open_document", new_type=kind, hidden=True)
+            for kind in ("writer", "writer", "calc")
+        ))
+        assert len({doc["title"] for doc in opened}) == 3
+        await asyncio.gather(*(
+            call("save_document", doc=doc["title"], path=str(path))
+            for doc, path in zip(opened, paths)
+        ))
+        listed = (await call("list_open_documents"))["documents"]
+        assert {Path(doc["path"]) for doc in listed if doc["path"]} >= set(paths)
+
+        inserts = await asyncio.gather(
+            call("writer_insert_paragraphs", doc=str(paths[0]), texts=texts[0]),
+            call("writer_insert_paragraphs", doc=str(paths[1]), texts=texts[1]),
+            call("calc_set_range", doc=str(paths[2]), start="A1",
+                 values=[["Gamma", "Qty", "Total"], [7, 6, "=A2*B2"]]),
+        )
+        await asyncio.gather(
+            call("writer_format_paragraphs", doc=str(paths[0]), indices=inserts[0]["inserted"],
+                 bold=True, font_size=16),
+            call("writer_format_paragraphs", doc=str(paths[1]), indices=inserts[1]["inserted"],
+                 bold=False, font_size=11),
+            call("calc_format_range", doc=str(paths[2]), range="A1:C1", bold=True),
+        )
+        await asyncio.gather(*(call("save_document", doc=str(path)) for path in paths))
+        assert all(path.is_file() and path.stat().st_size > 0 for path in paths)
+        await asyncio.gather(*(
+            call("run_uno", doc=str(path), script="doc.close(True)", undo_group=False)
+            for path in paths
+        ))
+        reopened = await asyncio.gather(*(
+            call("open_document", path=str(path), hidden=True) for path in paths
+        ))
+        assert all(not doc["already_open"] for doc in reopened)
+
+        alpha, beta, sheet, formulas, error = await asyncio.gather(
+            call("writer_get_paragraphs", doc=str(paths[0])),
+            call("writer_get_paragraphs", doc=str(paths[1])),
+            call("calc_get_range", doc=str(paths[2]), range="A1:C2"),
+            call("calc_get_range", doc=str(paths[2]), range="C2", formulas=True),
+            call("writer_get_paragraphs", doc=str(tmp_path / "missing.odt"), expect_error=True),
+        )
+        assert "NO_DOCUMENT" in error and "Could not resolve document" in error
+        for result, expected_text, bold, size in (
+            (alpha, texts[0], True, 16), (beta, texts[1], False, 11),
+        ):
+            paragraphs = [p for p in result["paragraphs"] if p["text"]]
+            assert [p["text"] for p in paragraphs] == expected_text
+            assert all(p["font"]["bold"] is bold and p["font"]["size"] == size for p in paragraphs)
+        assert sheet["values"] == [["Gamma", "Qty", "Total"], [7, 6, 42]]
+        assert formulas["values"] == [["=A2*B2"]]
+        await asyncio.gather(*(
+            call("run_uno", doc=str(path), script="doc.close(True)", undo_group=False)
+            for path in paths
+        ))
+        remaining = (await call("list_open_documents"))["documents"]
+        assert {(d["title"], d["path"]) for d in remaining} == {
+            (d["title"], d["path"]) for d in baseline
+        }
+
+    await _session(office, body, mode=mode)
 
 
 @pytest.mark.asyncio

@@ -6,6 +6,28 @@ Start with:
 uv run --locked python src/main.py --check
 ```
 
+## Server is running but the output panel is quiet
+
+This is normal while the stdio server is idle. Standard output carries MCP JSON-RPC messages,
+not a startup banner or terminal prompt; the client displays tool results in chat instead.
+Call `list_open_documents` to check the client-to-server-to-LibreOffice connection. An empty
+`documents` list is a successful response: LibreOffice has no documents open.
+
+For a separate terminal diagnostic, run the `--check` command above. It reports the installation
+and pipe connection without starting LibreOffice. Restart the MCP server after updating its
+code or environment so the client uses the new process.
+
+## Working on several documents concurrently
+
+Concurrent requests are accepted, but live UNO operations are serialized within each MCP server
+process. They queue safely rather than editing LibreOffice simultaneously. This is not a
+multi-user collaborative editor or a guarantee of higher throughput.
+
+Pass an explicit `doc`, preferably the full saved path, on every concurrent request. Do not rely
+on the active window or document indices, which can change as documents open or close. Wait for
+each file's edits to finish before saving or closing that file; independent files may be submitted
+together. The lock does not coordinate separate MCP server processes or manual user edits.
+
 ## `NO_CONNECTION`: could not connect to LibreOffice
 
 **Cause.** LibreOffice isn't accepting UNO connections on the pipe.

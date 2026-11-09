@@ -12,7 +12,9 @@ Built on MCP Python SDK v2. The server speaks protocol **2026-07-28** (stateless
 and still answers clients using the older `initialize` handshake (2025-11-25), such as current VS Code.
 Every tool declares MCP annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`,
 `openWorldHint: false`) so clients can auto-approve the read-only tools and prompt only for edits.
-Tool calls are serialized, so parallel requests never interleave edits on a document.
+Within one MCP server process, live UNO operations are serialized: concurrent requests queue
+rather than edit simultaneously. Use explicit document paths when working on several files;
+the lock does not coordinate separate server processes or manual user edits.
 
 ## Requirements
 
@@ -130,7 +132,9 @@ uv run --locked pytest
 - `tests/test_server_startup.py` checks the tool list, app filtering and file conversion.
 - `tests/test_live_tools.py` starts its **own** headless LibreOffice with a temporary profile and a
   unique pipe, then exercises Writer, Calc, Impress, Math and Base on synthetic documents. It never
-  touches your LibreOffice session.
+  touches your LibreOffice session. Concurrent requests on three files (ODT, DOCX and ODS) are
+  tested through both protocol modes, including save/reopen, formatting and formula preservation,
+  document isolation and a failed request alongside successful reads.
 
 ## Documentation
 

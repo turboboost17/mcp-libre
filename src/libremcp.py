@@ -32,6 +32,7 @@ from typing import Any, Dict, List, Optional, Union
 import threading
 
 from mcp.server.mcpserver import Image, MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import BaseModel, Field
 
@@ -202,8 +203,8 @@ def _bridge(op: str, **args: Any) -> Dict[str, Any]:
             message += (f" Start LibreOffice with: soffice --accept=\"pipe,name={PIPE};urp;\" "
                         "(or unset LIBREMCP_AUTOSTART=0).")
         if response.get("traceback"):
-            message += "\n" + response["traceback"]
-        raise RuntimeError(message)
+            raise RuntimeError(message + "\n" + response["traceback"])
+        raise ToolError(f"{response.get('code', 'ERROR')}: {message}")
     result = response.get("result")
     if response.get("stdout"):
         result = dict(result or {})
